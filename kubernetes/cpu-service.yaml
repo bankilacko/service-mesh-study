@@ -1,0 +1,45 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: cpu-service
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: cpu-service
+  template:
+    metadata:
+      labels:
+        app: cpu-service
+    spec:
+      containers:
+        - name: cpu-service
+          image: bankilacko11/cpu-service:latest
+          imagePullPolicy: IfNotPresent
+          ports:
+            - containerPort: 8000
+          readinessProbe:
+            httpGet:
+              path: /health
+              port: 8000
+            initialDelaySeconds: 5
+            periodSeconds: 5
+          livenessProbe:
+            httpGet:
+              path: /health
+              port: 8000
+            initialDelaySeconds: 10
+            periodSeconds: 10
+
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: cpu-service
+spec:
+  selector:
+    app: cpu-service
+  type: ClusterIP
+  ports:
+    - port: 8000
+      targetPort: 8000
