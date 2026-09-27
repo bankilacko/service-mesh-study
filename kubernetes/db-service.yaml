@@ -15,7 +15,7 @@ spec:
       containers:
         - name: db-service
           image: bankilacko11/db-service:latest
-          imagePullPolicy: IfNotPresent
+          imagePullPolicy: Always
           ports:
             - containerPort: 8000
           env:
