@@ -1,5 +1,5 @@
 import os
-
+import httpx
 import psycopg
 from fastapi import FastAPI
 
@@ -11,6 +11,8 @@ DB_PORT = os.getenv("DB_PORT", "5432")
 DB_NAME = os.getenv("DB_NAME", "service_db")
 DB_USER = os.getenv("DB_USER", "postgres")
 DB_PASSWORD = os.getenv("DB_PASSWORD", "postgres")
+
+CPU_SERVICE_URL = "http://cpu-service:8000"
 
 
 def get_connection():
@@ -55,4 +57,21 @@ async def query():
             {"id": row[0], "name": row[1]}
             for row in rows
         ],
+    }
+
+
+@app.get("/chain/cpu")
+async def chain_cpu():
+    async with httpx.AsyncClient() as client:
+        response = await client.get(f"{CPU_SERVICE_URL}/compute")
+        response.raise_for_status()
+
+    return {
+        "service": "db-service",
+        "chain": [
+            "db-service",
+            "cpu-service",
+        ],
+        "status": "ok",
+        "response": response.json(),
     }

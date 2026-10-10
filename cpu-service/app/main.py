@@ -1,6 +1,9 @@
 from fastapi import FastAPI, Query
+import httpx
 
 app = FastAPI(title="CPU Service")
+
+DB_SERVICE_URL = "http://db-service:8000"
 
 
 @app.get("/health")
@@ -21,4 +24,22 @@ async def compute(
         "service": "cpu-service",
         "iterations": iterations,
         "result": result,
+    }
+
+
+@app.get("/chain/db")
+async def chain_db():
+    async with httpx.AsyncClient() as client:
+        response = await client.get(f"{DB_SERVICE_URL}/query")
+        response.raise_for_status()
+
+    return {
+        "service": "cpu-service",
+        "chain": [
+            "cpu-service",
+            "db-service",
+            "postgres",
+        ],
+        "status": "ok",
+        "response": response.json(),
     }

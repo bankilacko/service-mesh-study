@@ -35,3 +35,40 @@ async def call_db_service():
         "service": "api-service",
         "response": response.json(),
     }
+
+
+@app.get("/chain/cpu")
+async def chain_cpu():
+    async with httpx.AsyncClient() as client:
+        response = await client.get(f"{CPU_SERVICE_URL}/chain/db")
+        response.raise_for_status()
+
+    return {
+        "service": "api-service",
+        "chain": [
+            "api-service",
+            "cpu-service",
+            "db-service",
+            "postgres",
+        ],
+        "status": "ok",
+        "response": response.json(),
+    }
+
+
+@app.get("/chain/db")
+async def chain_db():
+    async with httpx.AsyncClient() as client:
+        response = await client.get(f"{DB_SERVICE_URL}/chain/cpu")
+        response.raise_for_status()
+
+    return {
+        "service": "api-service",
+        "chain": [
+            "api-service",
+            "db-service",
+            "cpu-service",
+        ],
+        "status": "ok",
+        "response": response.json(),
+    }    
