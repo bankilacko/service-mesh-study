@@ -1,5 +1,6 @@
 import http from 'k6/http';
 import { check } from 'k6';
+import { BASE_URL } from '../config.js';
 
 export const options = {
     vus: 1,
@@ -7,7 +8,7 @@ export const options = {
 };
 
 export default function () {
-    const response = http.get('http://152.66.245.139:22290/health');
+    const response = http.get(`${BASE_URL}/health`);
 
     check(response, {
         'status is 200': (r) => r.status === 200,
