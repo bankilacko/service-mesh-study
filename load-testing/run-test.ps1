@@ -30,6 +30,7 @@ New-Item -ItemType Directory -Path $ResultDir -Force |
 $MetadataPath = Join-Path $ResultDir "metadata.json"
 $SummaryPath = Join-Path $ResultDir "k6-summary.json"
 $MetricsPath = Join-Path $ResultDir "prometheus-metrics.json"
+$HtmlReportPath = Join-Path $ResultDir "k6-report.html"
 
 # Mérési metaadatok
 $Metadata = [ordered]@{
@@ -85,6 +86,10 @@ $Queries = [ordered]@{
 }
 
 $PreviousBaseUrl = $env:BASE_URL
+$PreviousDashboard = $env:K6_WEB_DASHBOARD
+$PreviousDashboardExport = $env:K6_WEB_DASHBOARD_EXPORT
+$PreviousDashboardPeriod = $env:K6_WEB_DASHBOARD_PERIOD
+$PreviousDashboardPort = $env:K6_WEB_DASHBOARD_PORT
 $TestExitCode = 1
 $TestStartUnix = $null
 $MetricsStartUnix = $null
@@ -92,6 +97,11 @@ $MetricsStartUnix = $null
 try {
     # A config.js ezen a környezeti változón keresztül kapja a címet.
     $env:BASE_URL = $BaseUrl
+
+    $env:K6_WEB_DASHBOARD = "true"
+    $env:K6_WEB_DASHBOARD_EXPORT = $HtmlReportPath
+    $env:K6_WEB_DASHBOARD_PERIOD = "1s"
+    $env:K6_WEB_DASHBOARD_PORT = "-1"
 
     # A Prometheus-idősorban a teszt előtti 60 másodpercet is lekérjük.
     $Metadata.test_started_at = (Get-Date).ToString("o")
@@ -128,14 +138,44 @@ catch {
 finally {
     $Metadata.test_finished_at = (Get-Date).ToString("o")
 
-    # Az eredeti BASE_URL környezeti változó visszaállítása
+    # Az eredeti BASE_URL visszaállítása
     if ($null -eq $PreviousBaseUrl) {
         Remove-Item Env:BASE_URL -ErrorAction SilentlyContinue
     }
     else {
         $env:BASE_URL = $PreviousBaseUrl
     }
+
+    # A k6 dashboard környezeti változóinak visszaállítása
+    if ($null -eq $PreviousDashboard) {
+        Remove-Item Env:K6_WEB_DASHBOARD -ErrorAction SilentlyContinue
+    }
+    else {
+        $env:K6_WEB_DASHBOARD = $PreviousDashboard
+    }
+
+    if ($null -eq $PreviousDashboardExport) {
+        Remove-Item Env:K6_WEB_DASHBOARD_EXPORT -ErrorAction SilentlyContinue
+    }
+    else {
+        $env:K6_WEB_DASHBOARD_EXPORT = $PreviousDashboardExport
+    }
+
+    if ($null -eq $PreviousDashboardPeriod) {
+        Remove-Item Env:K6_WEB_DASHBOARD_PERIOD -ErrorAction SilentlyContinue
+    }
+    else {
+        $env:K6_WEB_DASHBOARD_PERIOD = $PreviousDashboardPeriod
+    }
+
+    if ($null -eq $PreviousDashboardPort) {
+        Remove-Item Env:K6_WEB_DASHBOARD_PORT -ErrorAction SilentlyContinue
+    }
+    else {
+        $env:K6_WEB_DASHBOARD_PORT = $PreviousDashboardPort
+    }
 }
+
 
 # Prometheus-idősorok lekérdezése
 if ($null -ne $MetricsStartUnix) {
@@ -215,6 +255,7 @@ Write-Host "Results:        $ResultDir"
 Write-Host "Summary:        $SummaryPath"
 Write-Host "Metadata:       $MetadataPath"
 Write-Host "Prometheus data: $MetricsPath"
+Write-Host "HTML report:    $HtmlReportPath"
 
 if ($TestExitCode -ne 0) {
     exit 1
