@@ -1,9 +1,89 @@
-from fastapi import FastAPI, Query
-import httpx
+import logging
+from contextlib import asynccontextmanager
+from typing import Any
 
-app = FastAPI(title="CPU Service")
+import httpx
+from fastapi import FastAPI, HTTPException, Query, Request
+
+
+logger = logging.getLogger("cpu-service")
 
 DB_SERVICE_URL = "http://db-service:8000"
+
+HTTP_TIMEOUT = httpx.Timeout(
+    10.0,
+    connect=2.0,
+)
+
+HTTP_LIMITS = httpx.Limits(
+    max_connections=100,
+    max_keepalive_connections=20,
+    keepalive_expiry=30.0,
+)
+
+
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    async with httpx.AsyncClient(
+        timeout=HTTP_TIMEOUT,
+        limits=HTTP_LIMITS,
+    ) as client:
+        app.state.http_client = client
+        yield
+
+
+app = FastAPI(
+    title="CPU Service",
+    lifespan=lifespan,
+)
+
+
+async def get_upstream_json(
+    client: httpx.AsyncClient,
+    url: str,
+    service_name: str,
+) -> Any:
+    try:
+        response = await client.get(url)
+        response.raise_for_status()
+
+        return response.json()
+
+    except httpx.HTTPStatusError as exc:
+        logger.warning(
+            "%s returned HTTP %s for %s",
+            service_name,
+            exc.response.status_code,
+            url,
+        )
+
+        raise HTTPException(
+            status_code=502,
+            detail=f"{service_name} returned HTTP {exc.response.status_code}",
+        ) from exc
+
+    except httpx.RequestError as exc:
+        logger.warning(
+            "Request to %s failed: %s",
+            service_name,
+            exc,
+        )
+
+        raise HTTPException(
+            status_code=502,
+            detail=f"{service_name} is unavailable",
+        ) from exc
+
+    except ValueError as exc:
+        logger.warning(
+            "%s returned invalid JSON",
+            service_name,
+        )
+
+        raise HTTPException(
+            status_code=502,
+            detail=f"{service_name} returned invalid JSON",
+        ) from exc
 
 
 @app.get("/health")
@@ -12,8 +92,11 @@ async def health():
 
 
 @app.get("/compute")
-async def compute(
-    iterations: int = Query(default=1_000_000, ge=1)
+def compute(
+    iterations: int = Query(
+        default=250_000,
+        ge=1,
+    )
 ):
     result = 0
 
@@ -28,10 +111,14 @@ async def compute(
 
 
 @app.get("/chain/db")
-async def chain_db():
-    async with httpx.AsyncClient() as client:
-        response = await client.get(f"{DB_SERVICE_URL}/query")
-        response.raise_for_status()
+async def chain_db(request: Request):
+    client = request.app.state.http_client
+
+    data = await get_upstream_json(
+        client,
+        f"{DB_SERVICE_URL}/query",
+        "DB Service",
+    )
 
     return {
         "service": "cpu-service",
@@ -41,5 +128,5 @@ async def chain_db():
             "postgres",
         ],
         "status": "ok",
-        "response": response.json(),
+        "response": data,
     }

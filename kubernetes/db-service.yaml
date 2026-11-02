@@ -16,31 +16,62 @@ spec:
         - name: db-service
           image: bankilacko11/db-service:latest
           imagePullPolicy: Always
+
           ports:
             - containerPort: 8000
+
           env:
             - name: DB_HOST
               value: postgres
+
             - name: DB_PORT
               value: "5432"
+
             - name: DB_NAME
-              value: service_db
+              valueFrom:
+                secretKeyRef:
+                  name: postgres-secret
+                  key: POSTGRES_DB
+
             - name: DB_USER
-              value: postgres
+              valueFrom:
+                secretKeyRef:
+                  name: postgres-secret
+                  key: POSTGRES_USER
+
             - name: DB_PASSWORD
-              value: postgres
+              valueFrom:
+                secretKeyRef:
+                  name: postgres-secret
+                  key: POSTGRES_PASSWORD
+
+          # Readiness:
+          # a pod csak akkor kapjon forgalmat,
+          # ha a PostgreSQL elerheto.
           readinessProbe:
             httpGet:
-              path: /health
+              path: /ready
               port: 8000
+              scheme: HTTP
             initialDelaySeconds: 5
             periodSeconds: 5
+            timeoutSeconds: 3
+            successThreshold: 1
+            failureThreshold: 3
+
+          # Liveness:
+          # csak az alkalmazas eletkepesseget ellenorzi,
+          # a PostgreSQL elerhetosegetol fuggetlenul.
           livenessProbe:
             httpGet:
               path: /health
               port: 8000
+              scheme: HTTP
             initialDelaySeconds: 10
             periodSeconds: 10
+            timeoutSeconds: 2
+            successThreshold: 1
+            failureThreshold: 3
 
 ---
 apiVersion: v1
